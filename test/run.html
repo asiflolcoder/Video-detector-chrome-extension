@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VideoDetect Phase 1 tests — running…</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+  #results { list-style: none; padding: 0; }
+  #results li { margin: 0.25rem 0; padding: 0.4rem 0.6rem; border-left: 4px solid #999; }
+  #results li.pass { background: #e8f5e9; border-left-color: #2e7d32; }
+  #results li.fail { background: #fbe9e7; border-left-color: #c62828; }
+</style>
+</head>
+<body>
+<h1>VideoDetect — Phase 1 unit tests</h1>
+<p id="summary">Running…</p>
+<ul id="results"></ul>
+
+<script src="../content/src/collect.js"></script>
+<script src="../content/src/score.js"></script>
+<script src="../content/src/detect.js"></script>
+<script>
+(function () {
+  var list = document.getElementById("results");
+  var summary = document.getElementById("summary");
+  var passed = 0;
+  var failed = 0;
+
+  function record(ok, name, detail) {
+    var li = document.createElement("li");
+    li.className = ok ? "pass" : "fail";
+    li.textContent = (ok ? "PASS " : "FAIL ") + name + (detail ? " — " + detail : "");
+    list.appendChild(li);
+    if (ok) passed += 1; else failed += 1;
+  }
+
+  function assertTrue(value, name) { record(value === true, name, "expected true, got " + value); }
+  function assertFalse(value, name) { record(value === false, name, "expected false, got " + value); }
+  function assertEqual(actual, expected, name) { record(actual === expected, name, "expected " + expected + ", got " + actual); }
+  function assertNull(value, name) { record(value === null, name, "expected null, got " + value); }
+  function assertNotNull(value, name) { record(value !== null, name, "expected non-null, got " + value); }
+
+  function makeVideo(attrs, styleText) {
+    var video = document.createElement("video");
+    Object.keys(attrs).forEach(function (key) { video.setAttribute(key, attrs[key]); });
+    if (styleText) video.setAttribute("style", styleText);
+    return video;
+  }
+
+  // Runs fn with a fresh container attached to the live document so that
+  // layout-dependent checks (rect, area) work; removes it afterwards.
+  function withHost(fn) {
+    var host = document.createElement("div");
+    document.body.appendChild(host);
+    try { fn(host); } finally { host.remove(); }
+  }
+
+  // ---- collect.js ----
+  withHost(function (host) {
+    assertEqual(VideoDetect.collectVideos(host).length, 0, "collectVideos: empty container has no videos");
+    var v1 = makeVideo({ src: "a.mp4", preload: "none" });
+    var v2 = makeVideo({ src: "b.mp4", preload: "none" });
+    host.appendChild(v1);
+    host.appendChild(v2);
+    assertEqual(VideoDetect.collectVideos(host).length, 2, "collectVideos: finds every <video>");
+  });
+
+  assertNull(VideoDetect.toCandidate(makeVideo({}, "display:none")), "toCandidate: rejects display:none");
+  assertNull(VideoDetect.toCandidate(makeVideo({}, "visibility:hidden")), "toCandidate: rejects visibility:hidden");
+  assertNull(VideoDetect.toCandidate(makeVideo({ "aria-hidden": "true" })), "toCandidate: rejects aria-hidden (decorative)");
+  assertNull(VideoDetect.toCandidate(makeVideo({}, "width:0;height:0")), "toCandidate: rejects zero rendered area");
+
+  withHost(function (host) {
+    var sized = makeVideo({ width: "640", height: "360" });
+    host.appendChild(sized);
+    var candidate = VideoDetect.toCandidate(sized);
+    assertNotNull(candidate, "toCandidate: accepts a rendered video");
+    assertEqual(candidate.element, sized, "toCandidate: descriptor keeps the element");
+    assertEqual(Math.round(candidate.area), 640 * 360, "toCandidate: area is width x height");
+  });
+
+  withHost(function (host) {
+    var visible = makeVideo({ width: "320", height: "180" });
+    var hidden = makeVideo({ width: "1280", height: "720" }, "display:none");
+    host.appendChild(visible);
+    host.appendChild(hidden);
+    var candidates = VideoDetect.collectCandidates(host);
+    assertEqual(candidates.length, 1, "collectCandidates: only visible videos are candidates");
+    assertEqual(candidates[0].element, visible, "collectCandidates: the visible video survives");
+  });
+// ---- score.js ----
+  assertEqual(VideoDetect.scoreCandidate({ element: makeVideo({}), area: 100 }), 100, "score: plain video scores its area");
+  assertEqual(VideoDetect.scoreCandidate({ element: makeVideo({}), area: 0 }), 0, "score: zero-area candidate scores 0");
+  assertEqual(VideoDetect.scoreCandidate({ element: makeVideo({ src: "m.mp4" }), area: 100 }), 150, "score: src adds 50% of area");
+  assertEqual(VideoDetect.scoreCandidate({ element: makeVideo({ controls: "" }), area: 100 }), 125, "score: controls add 25% of area");
+  assertEqual(VideoDetect.scoreCandidate({ element: makeVideo({ src: "m.mp4", controls: "" }), area: 100 }), 175, "score: src and controls combine additively");
+
+  assertFalse(VideoDetect.hasLoadableSource(makeVideo({})), "hasLoadableSource: false with no source");
+  assertTrue(VideoDetect.hasLoadableSource(makeVideo({ src: "m.mp4" })), "hasLoadableSource: true with src attribute");
+  (function () {
+    var video = makeVideo({});
+    var source = document.createElement("source");
+    source.setAttribute("src", "m.webm");
+    video.appendChild(source);
+    assertTrue(VideoDetect.hasLoadableSource(video), "hasLoadableSource: true with <source> child");
+  })();
+  assertFalse(VideoDetect.hasControls(makeVideo({})), "hasControls: false without controls");
+  assertTrue(VideoDetect.hasControls(makeVideo({ controls: "" })), "hasControls: true with controls attribute");
+
+  // ---- detect.js ----
+  assertNull(VideoDetect.selectBest([]), "selectBest: returns null for an empty list");
+
+  withHost(function (host) {
+    assertNull(VideoDetect.detectMostRelevant(host), "detectMostRelevant: null when no videos");
+  });
+
+  withHost(function (host) {
+    var small = makeVideo({ width: "320", height: "180", src: "s.mp4", controls: "", preload: "none" });
+    var big = makeVideo({ width: "1280", height: "720", src: "b.mp4", controls: "", preload: "none" });
+    host.appendChild(small);
+    host.appendChild(big);
+    var best = VideoDetect.detectMostRelevant(host);
+    assertEqual(best.element, big, "detectMostRelevant: prefers the largest video");
+  });
+
+  withHost(function (host) {
+    var first = makeVideo({ width: "400", height: "225", preload: "none" });
+    var second = makeVideo({ width: "400", height: "225", preload: "none" });
+    host.appendChild(first);
+    host.appendChild(second);
+    var best = VideoDetect.selectBest(VideoDetect.collectCandidates(host));
+    assertEqual(best.element, first, "selectBest: ties resolve to the first video in document order");
+  });
+
+  withHost(function (host) {
+    var sourced = makeVideo({ width: "430", height: "240", src: "m.mp4", preload: "none" });
+    var unsourced = makeVideo({ width: "500", height: "300", preload: "none" });
+    host.appendChild(sourced);
+    host.appendChild(unsourced);
+    var best = VideoDetect.detectMostRelevant(host);
+    assertEqual(best.element, sourced, "detectMostRelevant: a sourced video beats a ~45% larger unsourced video");
+  });
+
+  withHost(function (host) {
+    var decorative = makeVideo({ width: "1920", height: "1080", src: "hero.mp4", "aria-hidden": "true", preload: "none" });
+    var main = makeVideo({ width: "640", height: "360", src: "main.mp4", controls: "", preload: "none" });
+    host.appendChild(decorative);
+    host.appendChild(main);
+    var best = VideoDetect.detectMostRelevant(host);
+    assertEqual(best.element, main, "detectMostRelevant: ignores larger decorative (aria-hidden) videos");
+  });
+
+  withHost(function (host) {
+    host.appendChild(makeVideo({ width: "640", height: "360", src: "m.mp4", controls: "", preload: "none" }));
+    var before = host.outerHTML;
+    VideoDetect.detectMostRelevant(host);
+    var after = host.outerHTML;
+    record(before === after, "detection does not modify page content");
+  });
+
+  // ---- summary ----
+  summary.textContent = passed + " passed, " + failed + " failed";
+  document.title = "VideoDetect Phase 1 tests: " + passed + " passed, " + failed + " failed";
+  document.documentElement.setAttribute("data-test-result", failed === 0 ? "PASS" : "FAIL");
+  console.log("[VideoDetect tests] " + passed + " passed, " + failed + " failed");
+})();
+</script>
+</body>
+</html>

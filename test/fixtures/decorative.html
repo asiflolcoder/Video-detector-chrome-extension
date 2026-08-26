@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Decorative hero — expected: the smaller in-content player</title>
+</head>
+<body>
+<h1>Hero video page</h1>
+<p>A giant aria-hidden background loop should be ignored; the smaller in-content player should win.</p>
+<video src="https://example.com/media/hero.mp4" aria-hidden="true" autoplay muted loop width="1920" height="1080" preload="none"></video>
+<video src="https://example.com/media/article.mp4" controls width="640" height="360" preload="none"></video>
+</body>
+</html>

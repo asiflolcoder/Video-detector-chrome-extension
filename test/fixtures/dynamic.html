@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dynamic video — expected: video injected after load</title>
+</head>
+<body>
+<h1>Dynamic page: video appears 1s after load</h1>
+<p>The MutationObserver should pick up the late player.</p>
+<div id="player-slot"></div>
+<script>
+  setTimeout(function () {
+    var video = document.createElement("video");
+    video.setAttribute("src", "https://example.com/media/late.mp4");
+    video.setAttribute("controls", "");
+    video.setAttribute("width", "960");
+    video.setAttribute("height", "540");
+    video.setAttribute("preload", "none");
+    document.getElementById("player-slot").appendChild(video);
+  }, 1000);
+</script>
+</body>
+</html>
