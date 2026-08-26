@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>End-to-end smoke — full pipeline</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+</style>
+</head>
+<body>
+<h1>End-to-end smoke: discovery → metadata → scoring report</h1>
+
+<!-- Fixture markup processed by the real content.js below. The main video is
+     deliberately the strongest candidate: large area (700x400 >= 250000px²),
+     fully on-screen, controls present, and still fits the first viewport row. -->
+<video src="https://example.com/media/small.mp4" width="240" height="120" preload="none"></video>
+<video src="https://example.com/media/main.mp4" width="700" height="400" controls preload="none"></video>
+<div style="height: 0;">
+  <video src="https://example.com/media/hidden.mp4" width="480" height="270" style="display:none" preload="none"></video>
+</div>
+
+<script>
+// Capture console output BEFORE content.js runs so its report can be asserted.
+window.__capturedLogs = [];
+window.__capturedTables = [];
+(function () {
+  const originalLog = console.log;
+  const originalTable = console.table;
+  console.log = function () {
+    window.__capturedLogs.push(Array.prototype.map.call(arguments, String).join(" "));
+    originalLog.apply(console, arguments);
+  };
+  console.table = function (rows) {
+    window.__capturedTables.push(rows);
+    originalTable.apply(console, arguments);
+  };
+})();
+</script>
+
+<script src="../../content/src/detector.js"></script>
+<script src="../../content/src/visibility.js"></script>
+<script src="../../content/src/playback.js"></script>
+<script src="../../content/src/metadata.js"></script>
+<script src="../../content/src/scorer.js"></script>
+<script src="../../content/src/selection.js"></script>
+<!-- Runs immediately on load, like it does inside the extension. -->
+<script src="../../content/src/content.js"></script>
+
+<script>
+(function () {
+  const logs = window.__capturedLogs;
+  const tables = window.__capturedTables;
+  const results = [];
+
+  function record(ok, name, detail) { results.push({ ok: ok, name: name, detail: detail }); }
+
+  record(logs.some(function (l) { return l.indexOf("Detected videos: 3") === 0; }),
+    "content.js logged 'Detected videos: 3'", JSON.stringify(logs));
+
+  record(tables.length === 1 && Array.isArray(tables[0]) && tables[0].length === 3,
+    "console.table received one table with three rows");
+  if (tables.length === 1 && Array.isArray(tables[0])) {
+    record(tables[0].every(function (row) { return typeof row.score === "number"; }),
+      "every table row carries a numeric score");
+    record(typeof tables[0][1].visible === "boolean",
+      "table rows carry visibility fields");
+  }
+
+  record(logs.some(function (l) { return l.indexOf("Selected video: #") === 0; }),
+    "content.js logged the selected-candidate line", JSON.stringify(logs));
+
+  // The main video must win over the hidden one.
+  record(logs.join("\n").indexOf("#1") !== -1,
+    "the visible main video (index 1) is reported as most relevant", JSON.stringify(logs));
+
+  const failed = results.filter(function (r) { return !r.ok; }).length;
+
+  // Mirror every verdict into the DOM so headless dump-dom runners see it.
+  const list = document.createElement("ul");
+  results.forEach(function (r) {
+    const li = document.createElement("li");
+    li.className = r.ok ? "pass" : "fail";
+    li.textContent = (r.ok ? "[e2e PASS] " : "[e2e FAIL] ") + r.name +
+      (r.detail ? " — " + r.detail : "");
+    list.appendChild(li);
+    console.log((r.ok ? "[e2e PASS] " : "[e2e FAIL] ") + r.name + (r.detail ? " — " + r.detail : ""));
+  });
+  document.body.appendChild(list);
+
+  document.title = "E2E smoke: " + (failed === 0 ? "PASS" : "FAIL") +
+    " (" + (results.length - failed) + "/" + results.length + ")";
+  document.documentElement.setAttribute("data-e2e-result", failed === 0 ? "PASS" : "FAIL");
+})();
+</script>
+</body>
+</html>

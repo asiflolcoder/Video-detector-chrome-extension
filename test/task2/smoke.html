@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task 2 smoke — running…</title>
+<style>body{font-family:system-ui,sans-serif;margin:1.5rem}ul{list-style:none;padding:0}</style>
+</head>
+<body>
+<h1>Task 2 — content.js smoke</h1>
+<p>Captures the console output of the real content-script entry (content.js).</p>
+<ul id="log"></ul>
+<p id="summary">Running…</p>
+
+<video src="https://example.com/media/one.mp4" width="320" height="180" preload="none"></video>
+<video src="https://example.com/media/two.mp4" width="640" height="360" preload="none"></video>
+<video src="https://example.com/media/three.mp4" width="480" height="270" controls preload="none"></video>
+
+<script>
+  (function () {
+    var logList = document.getElementById("log");
+    var orig = console.log.bind(console);
+    console.log = function () {
+      var li = document.createElement("li");
+      li.textContent = Array.prototype.slice.call(arguments).join(" ");
+      logList.appendChild(li);
+      orig.apply(null, arguments);
+    };
+  })();
+</script>
+<script src="../../content/src/detector.js"></script>
+<script src="../../content/src/content.js"></script>
+<script>
+  (function () {
+    var entries = Array.prototype.map.call(document.querySelectorAll("#log li"), function (li) { return li.textContent; });
+    var ok = entries.indexOf("Detected videos: 3") !== -1;
+    document.getElementById("summary").textContent = "log check: " + (ok ? "PASS" : "FAIL") + " — " + entries.join(" | ");
+    document.documentElement.setAttribute("data-smoke", ok ? "PASS" : "FAIL");
+    console.log("[Task 2 smoke] " + (ok ? "PASS" : "FAIL"));
+  })();
+</script>
+</body>
+</html>

@@ -1,16 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Distraction-Free Video",
-  "version": "0.1.0",
-  "description": "Phase 1: detects the most relevant video on a webpage without modifying the page.",
+  "version": "0.8.0",
+  "description": "Detects videos on a webpage and reports the most relevant candidate. Read-only.",
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
       "js": [
-        "content/src/collect.js",
-        "content/src/score.js",
-        "content/src/detect.js",
-        "content/src/index.js"
+        "content/src/detector.js",
+        "content/src/visibility.js",
+        "content/src/playback.js",
+        "content/src/metadata.js",
+        "content/src/scorer.js",
+        "content/src/selection.js",
+        "content/src/content.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

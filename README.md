@@ -1,65 +1,76 @@
-# Distraction-Free Video — Phase 1: Video Detection
+# Distraction-Free Video
 
-Chrome Extension (Manifest V3), vanilla JavaScript, no dependencies, no bundler.
+Chrome Extension (Manifest V3). Vanilla JavaScript — no dependencies, no
+bundler, no frameworks, no remote code.
 
-## What Phase 1 does
-Finds the "most relevant" `<video>` element in a page and logs it to the
-DevTools console. It never modifies the page: no CSS injection, no DOM changes,
-no moving/cloning/removing video elements.
+## What it does (Phase 1)
+On page load the extension detects every `<video>` element in the top frame,
+analyzes each one, and reports the most relevant candidate in the DevTools
+console. **It never modifies the page** — analysis is strictly read-only.
 
-## How detection works
-1. `collect.js` — gathers every `<video>` element and filters out non-candidates:
-   hidden by styles (`display:none`, `visibility:hidden`), zero rendered area,
-   or marked `aria-hidden` (decorative / background content).
-2. `score.js` — scores each candidate:
-   - base score = visible area (width × height)
-   - `+50%` when the video has a loadable source (`src`, `<source>`, `srcObject`)
-   - `+25%` when the video shows native controls
-3. `detect.js` — picks the highest-scoring candidate; ties go to the first
-   video in document order.
+Pipeline (`content/src/`):
 
-The content-script entry (`index.js`) runs detection on load and re-runs it
-(debounced) when a video element appears, disappears, or changes its
-`src`/`controls`/`hidden` attributes, because many sites build players late.
+```
+detector.js    findVideoElements(doc)        discovery only; returns []
+                                             safely when none exist
+visibility.js  isVideoVisible(video[,rect])  rendered size / display /
+               getViewportIntersection(...)  visibility / opacity checks,
+                                               viewport coverage (0..1)
+playback.js    getPlaybackState(video)       paused/ended/time/duration and
+                                             a conservative isPlaying verdict
+metadata.js    getVideoMetadata(video)       one plain object per video;
+                                             measures the bounding rect ONCE
+                                             and shares it with visibility.js
+scorer.js      scoreVideo(candidate)         deterministic additive score +
+                                             explicit reason strings
+selection.js   selectBestVideo(candidates)   highest score wins; ties fall
+                                             back to larger area, then stay
+                                             stable in document order;
+                                             null for empty input
+content.js     entry point                   the seven-step pipeline report:
+                                             console.table list plus a
+                                             separate selected-video line
+```
 
-## Why these weights
-- **Area is the dominant signal.** The main player is almost always the largest
-  `<video>` on the page.
-- **Source bonus (`0.5 × area`)** only reorders candidates of comparable size,
-  so a sourced in-content player beats a slightly larger element without media.
-- **Controls bonus (`0.25 × area`)** further favors real players over
-  autoplaying loops.
-- **`aria-hidden` is a disqualifier.** Per WCAG it marks decorative content
-  (e.g. background/hero loops), not something a user watches.
+## Scoring model (tune constants at the top of scorer.js)
+| Factor | Condition | Points | Reason |
+|---|---|---|---|
+| Visibility | `visible === true` | 25 | `visible` |
+| Large area | `area >= 250000px²` | 25 | `large-rendered-area` |
+| Medium area | `area >= 50000px²` | 12 | `medium-rendered-area` |
+| In viewport | coverage `>= 0.75` | 15 | `mostly-in-viewport` |
+| Playing | conservative check | 15 | `currently-playing` |
+| Audio | unmuted & volume > 0 | 10 | `has-audio` |
+| Duration | finite & >= 10s | 10 | `meaningful-duration` |
 
-## Known limitations (Phase 1)
-- Top frame only; cross-origin iframes (e.g. YouTube embeds) are not scanned.
-- Videos inside shadow DOM are not seen by `querySelectorAll`.
-- A large hero video *without* `aria-hidden` can outrank a smaller in-content
-  player.
-- No viewport-proximity logic; an off-screen large video may win.
+Max 100. "Playing" is deliberately strict (`readyState >= HAVE_FUTURE_DATA`),
+so a stalling stream is never ranked as playing. Ties resolve to the earliest
+video in document order.
 
-## Project layout
-- `manifest.json` — MV3, zero permissions, injects into `http`/`https`.
-- `content/src/collect.js`, `score.js`, `detect.js` — pure detection logic.
-- `content/src/index.js` — content-script entry point.
-- `test/run.html` — unit test harness (open in any browser).
-- `test/fixtures/` — sample pages for manual extension testing.
+## Security & privacy stance
+- Zero permissions, zero host permissions; no background worker.
+- Content scripts run in Chrome's isolated world; the page cannot observe them.
+- No storage, no messaging ports, no cookies, no network requests, no user-data
+  inspection. See [AUDIT.md](AUDIT.md).
 
-## How to test
-### Unit tests
-Open `test/run.html` in a browser (or serve the folder). Every assertion runs
-and renders PASS/FAIL with a summary.
+## Testing
+- `test/all.html` — runs **all suites** with one PASS/FAIL verdict.
+- `tools/run-all.ps1` — headless runner for every page (exit code = gate).
+- `tools/static-checks.mjs` — security/policy linter.
+- Per-task suites live in `test/task2..task6/tests.js`; robustness suites in
+  `test/product/`.
 
-### Extension behavior
-1. Open `chrome://extensions`, enable Developer mode.
-2. "Load unpacked" → select this project folder.
-3. Serve this folder over HTTP: `py -m http.server 8765` (or `python -m http.server 8765`).
-4. Visit one of:
-   - http://127.0.0.1:8765/test/fixtures/single.html
-   - http://127.0.0.1:8765/test/fixtures/multiple.html
-   - http://127.0.0.1:8765/test/fixtures/dynamic.html
-   - http://127.0.0.1:8765/test/fixtures/decorative.html
-   - http://127.0.0.1:8765/test/fixtures/negative.html
-5. Open the DevTools console and look for `[VideoDetect] most relevant video: …`
-   or `[VideoDetect] no candidate video found`.
+```powershell
+node --check content/src/detector.js   # syntax (repeat per file)
+node tools/static-checks.mjs           # security gate
+powershell -ExecutionPolicy Bypass -File tools\run-all.ps1   # full test run
+```
+
+Manual: load unpacked at `chrome://extensions`, serve fixtures with
+`py -m http.server 8765`, then visit e.g.
+`http://127.0.0.1:8765/test/fixtures/three-videos.html` and read the console.
+
+## Current limitations
+Top frame only; no Shadow DOM piercing; no iframe traversal; no occlusion
+detection beyond geometry/styles; single-pass reporting (no MutationObserver).
+These are queued as later tasks by design.

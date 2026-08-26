@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task 4 manual test — video visibility cases</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 60rem; }
+  h2 { font-size: 1rem; margin: 1.25rem 0 0.25rem; }
+  p.hint { color: #555; font-size: 0.9rem; margin-top: 0; }
+</style>
+</head>
+<body>
+<h1>Task 4 — video visibility manual test</h1>
+<p class="hint">Load this folder as an unpacked extension, open this page over HTTP,
+and check the DevTools console table: each row should report
+<code>visible</code> and <code>viewportCoverage</code> matching its label below.</p>
+
+<h2>Case 1 — visible video (expected: visible=true, coverage≈1)</h2>
+<video id="v1" width="480" height="270" controls></video>
+
+<h2>Case 2 — display:none video (expected: visible=false, coverage=0)</h2>
+<video id="v2" width="480" height="270" style="display: none;"></video>
+
+<h2>Case 3 — visibility:hidden video (expected: visible=false; it still occupies layout space)</h2>
+<video id="v3" width="480" height="270" style="visibility: hidden;"></video>
+
+<h2>Case 4 — zero-size video (expected: visible=false)</h2>
+<p class="hint">Both attribute-sized (width=0/height=0) and style-collapsed (height:0).</p>
+<video id="v4a" width="0" height="0"></video>
+<video id="v4b" width="480" height="0" style="height: 0;"></video>
+
+<h2>Case 5 — partially outside the viewport (expected: visible=true, coverage between 0 and 1)</h2>
+<p class="hint">Halfway pushed past the right edge.</p>
+<div style="position: relative; height: 200px;">
+  <video id="v5" width="480" height="200" style="position: absolute; left: calc(100% - 240px); top: 0;"></video>
+</div>
+
+</body>
+</html>

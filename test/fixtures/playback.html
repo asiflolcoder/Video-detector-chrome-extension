@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task 5 manual test — playback state</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 60rem; }
+  h2 { font-size: 1rem; margin: 1.25rem 0 0.25rem; }
+  p.hint { color: #555; font-size: 0.9rem; margin-top: 0; }
+</style>
+</head>
+<body>
+<h1>Task 5 — playback state manual test</h1>
+<p class="hint">With the extension loaded, the console table shows a
+<code>playing</code> column. Case 1 starts paused (playing=false).
+Case 2 uses muted autoplay and loops, so once it starts it should show
+playing=true (muted autoplay is allowed by browsers).</p>
+
+<h2>Case 1 — paused video (expected: playing=false)</h2>
+<video id="v1" width="480" height="270" controls></video>
+
+<h2>Case 2 — playing video (expected: playing=true while looping)</h2>
+<video id="v2" width="480" height="270" controls loop></video>
+
+<script>
+  // Set via properties (parser only seeds some states from attributes) — but
+  // we do NOT call play() ourselves; case 2 relies on browser-muted autoplay.
+  var v2 = document.getElementById("v2");
+  v2.muted = true;
+  v2.autoplay = true;
+</script>
+</body>
+</html>

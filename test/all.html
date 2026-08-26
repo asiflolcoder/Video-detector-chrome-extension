@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Full test run — all suites</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+  #suite-root ul { list-style: none; padding: 0; margin-top: 0.25rem; }
+  #suite-root li { margin: 0.15rem 0; padding: 0.25rem 0.6rem; border-left: 4px solid #999; }
+  #suite-root li.pass { border-left-color: #2e7d32; }
+  #suite-root li.fail { background: #fbe9e7; border-left-color: #c62828; }
+  #verdict { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Distraction-Free Video — full test suite</h1>
+<p id="summary">Running…</p>
+<div id="suite-root"></div>
+
+<!-- Required by the task2 suite: exactly three static videos in the document.
+     Other suites clean up after themselves via harness withHost(). -->
+<video src="https://example.com/media/one.mp4" width="320" height="180" preload="none"></video>
+<video src="https://example.com/media/two.mp4" width="640" height="360" preload="none"></video>
+<video src="https://example.com/media/three.mp4" width="480" height="270" controls preload="none"></video>
+
+<script src="../content/src/detector.js"></script>
+<script src="../content/src/visibility.js"></script>
+<script src="../content/src/playback.js"></script>
+<script src="../content/src/metadata.js"></script>
+<script src="../content/src/scorer.js"></script>
+<script src="../content/src/selection.js"></script>
+<script src="lib/harness.js"></script>
+
+<script src="task2/tests.js"></script>
+<script src="task3/tests.js"></script>
+<script src="task4/tests.js"></script>
+<script src="task5/tests.js"></script>
+<script src="task6/tests.js"></script>
+<script src="task7/tests.js"></script>
+<script src="product/tests.js"></script>
+
+<script>
+(function () {
+  const suites = ["task2", "task3", "task4", "task5", "task6", "task7", "stress"];
+  const outcome = VD.runSuites(document.getElementById("suite-root"), suites);
+
+  const lines = outcome.perSuite.map(function (s) {
+    return s.name + ": " + s.passed + "/" + (s.passed + s.failed);
+  });
+  document.getElementById("summary").textContent =
+    outcome.totalPassed + " passed, " + outcome.totalFailed + " failed — " + lines.join(" | ");
+
+  document.title = "All suites: " + (outcome.totalFailed === 0 ? "PASS" : "FAIL") +
+    " (" + outcome.totalPassed + " passed, " + outcome.totalFailed + " failed)";
+  document.documentElement.setAttribute("data-all-result", outcome.totalFailed === 0 ? "PASS" : "FAIL");
+})();
+</script>
+</body>
+</html>

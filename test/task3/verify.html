@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task 3 — getVideoMetadata verification</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 1.5rem; }
+  #suite-root ul { list-style: none; padding: 0; }
+  #suite-root li { margin: 0.25rem 0; padding: 0.4rem 0.6rem; border-left: 4px solid #999; }
+  #suite-root li.pass { background: #e8f5e9; border-left-color: #2e7d32; }
+  #suite-root li.fail { background: #fbe9e7; border-left-color: #c62828; }
+</style>
+</head>
+<body>
+<h1>Task 3 — video metadata extraction</h1>
+<div id="suite-root"></div>
+
+<script src="../../content/src/detector.js"></script>
+<script src="../../content/src/visibility.js"></script>
+<script src="../../content/src/playback.js"></script>
+<script src="../../content/src/metadata.js"></script>
+<script src="../lib/harness.js"></script>
+<script src="tests.js"></script>
+<script>
+(function () {
+  const outcome = VD.runSuites(document.getElementById("suite-root"), ["task3"]);
+  document.title = "Task 3 verification: " + outcome.totalPassed + " passed, " + outcome.totalFailed + " failed";
+  document.documentElement.setAttribute("data-task3-result", outcome.totalFailed === 0 ? "PASS" : "FAIL");
+})();
+</script>
+</body>
+</html>
